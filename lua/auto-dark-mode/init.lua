@@ -29,7 +29,7 @@ local function parse_query_response(res)
 		-- 2: light
 		return string.match(res, "uint32 1") ~= nil
 	elseif system == "Linux" then
-		return string.match(res, "prefer-dark") ~= nil 
+		return string.match(res, "1") ~= nil 
 	elseif system == "Darwin" then
 		return res == "Dark"
 	elseif system == "Windows_NT" or system == "WSL" then
@@ -81,7 +81,7 @@ local function init()
 	if system == "Darwin" then
 		query_command = "defaults read -g AppleInterfaceStyle"
 	elseif system == "Linux" then 
-		query_command = "dconf read /org/gnome/desktop/interface/color-scheme"
+		query_command = "dconf read /org/gnome/desktop/interface/color-scheme | grep "prefer-dark" | wc -l"
 	elseif system == "LinuxLegacy" then
 		if not vim.fn.executable("dbus-send") then
 			error([[
