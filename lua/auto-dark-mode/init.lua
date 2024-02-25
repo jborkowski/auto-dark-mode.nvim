@@ -29,7 +29,7 @@ local function parse_query_response(res)
 		-- 2: light
 		return string.match(res, "uint32 1") ~= nil
 	elseif system == "Linux" then
-		return string.match(res, "'prefer-dark'") ~= nil 
+		return string.match(res, "prefer-dark") ~= nil 
 	elseif system == "Darwin" then
 		return res == "Dark"
 	elseif system == "Windows_NT" or system == "WSL" then
