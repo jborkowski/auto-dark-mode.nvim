@@ -78,7 +78,9 @@ local function init()
 
 	if system == "Darwin" then
 		query_command = "defaults read -g AppleInterfaceStyle"
-	elseif system == "Linux" then
+	elseif system == "Linux" then 
+		query_command = "while read -r line; do [[ $line == *"prefer-dark"* ]] && echo 1 ; done < <(dconf watch /org/gnome/desktop/interface/color-scheme)"
+	elseif system == "LinuxLegacy" then
 		if not vim.fn.executable("dbus-send") then
 			error([[
 		`dbus-send` is not available. The Linux implementation of
