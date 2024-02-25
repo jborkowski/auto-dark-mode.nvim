@@ -79,7 +79,12 @@ local function init()
 	if system == "Darwin" then
 		query_command = "defaults read -g AppleInterfaceStyle"
 	elseif system == "Linux" then 
-		query_command = "while read -r line; do [[ $line == *"prefer-dark"* ]] && echo 1 ; done < <(dconf watch /org/gnome/desktop/interface/color-scheme)"
+		query_command = table.concat({
+		 	"while read -r line;",
+			"do [[ $line == *\"prefer-dark\"* ]]",
+			"&& echo 1 ; done <",
+			"<(dconf watch /org/gnome/desktop/interface/color-scheme)"
+			}, " ")
 	elseif system == "LinuxLegacy" then
 		if not vim.fn.executable("dbus-send") then
 			error([[
