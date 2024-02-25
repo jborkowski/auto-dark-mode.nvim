@@ -22,12 +22,14 @@ local system
 ---@param res string
 ---@return boolean
 local function parse_query_response(res)
-	if system == "Linux" then
+	if system == "LinuxLegacy" then
 		-- https://github.com/flatpak/xdg-desktop-portal/blob/c0f0eb103effdcf3701a1bf53f12fe953fbf0b75/data/org.freedesktop.impl.portal.Settings.xml#L32-L46
 		-- 0: no preference
 		-- 1: dark
 		-- 2: light
 		return string.match(res, "uint32 1") ~= nil
+	elseif if system == "Linux" then
+		return string.match(res, "prefer-dark") ~= nil 
 	elseif system == "Darwin" then
 		return res == "Dark"
 	elseif system == "Windows_NT" or system == "WSL" then
@@ -79,7 +81,7 @@ local function init()
 	if system == "Darwin" then
 		query_command = "defaults read -g AppleInterfaceStyle"
 	elseif system == "Linux" then 
-		query_command = "while read -r line; do [[ $line == *prefer-dark* ]] && echo 1 ; done < <(dconf watch /org/gnome/desktop/interface/color-scheme)"
+		query_command = "while read -r line; do [[ $line == *prefer-dark* ]] && echo 'prefer-dark' ; done < <(dconf watch /org/gnome/desktop/interface/color-scheme)"
 	elseif system == "LinuxLegacy" then
 		if not vim.fn.executable("dbus-send") then
 			error([[
