@@ -74,7 +74,7 @@ end
 local function init()
 	if string.match(vim.loop.os_uname().release, "WSL") then
 		system = "WSL"
-	elseif vim.fn.filereadable("/.dockerenv") == 1 or vim.fn.filereadable("/proc/1/cgroup") == 1 and string.match(vim.fn.readfile("/proc/1/cgroup")[1] or "", "docker") then
+	elseif vim.fn.filereadable("/.dockerenv") == 1 then
 		system = "Docker" .. vim.loop.os_uname().sysname
 		print("Running inside Docker container")
 	else
