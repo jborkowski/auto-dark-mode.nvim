@@ -74,14 +74,20 @@ end
 local function init()
 	if string.match(vim.loop.os_uname().release, "WSL") then
 		system = "WSL"
+	elseif vim.fn.filereadable("/.dockerenv") == 1 or vim.fn.filereadable("/proc/1/cgroup") == 1 and string.match(vim.fn.readfile("/proc/1/cgroup")[1] or "", "docker") then
+		system = "Docker" .. vim.loop.os_uname().sysname
+		print("Running inside Docker container")
 	else
 		system = vim.loop.os_uname().sysname
 	end
+
 
 	if system == "Darwin" then
 		query_command = "defaults read -g AppleInterfaceStyle"
 	elseif system == "Linux" then 
 		query_command = "dconf read /org/gnome/desktop/interface/color-scheme | grep 'prefer-dark' | wc -l"
+  elseif system == "DockerLinux" then 
+    query_command = "cat ~/.color-scheme | grep 'prefer-dark' | wc -l"
 	elseif system == "LinuxLegacy" then
 		if not vim.fn.executable("dbus-send") then
 			error([[
