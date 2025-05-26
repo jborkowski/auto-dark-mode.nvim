@@ -28,7 +28,7 @@ local function parse_query_response(res)
 		-- 1: dark
 		-- 2: light
 		return string.match(res, "uint32 1") ~= nil
-	elseif system == "Linux" then
+	elseif system == "Linux" or system == "DockerLinux" then
 		return string.match(res, "1") ~= nil 
 	elseif system == "Darwin" then
 		return res == "Dark"
