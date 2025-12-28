@@ -1,0 +1,76 @@
+#!/bin/bash
+# Query terminal background color via OSC 11
+# Returns "dark" or "light" based on perceived luminance
+#
+# Install to ~/.local/bin/query-terminal-bg for auto-dark-mode.nvim
+# to use when running over SSH/remote sessions.
+#
+# Requires tmux 3.3+ with `set -g allow-passthrough on` for tmux support.
+
+# Check if we have a TTY
+if [[ ! -t 0 ]] && [[ ! -e /dev/tty ]]; then
+    echo "dark"
+    exit 0
+fi
+
+# Use /dev/tty for terminal I/O
+exec < /dev/tty
+exec > /dev/tty
+
+# Save terminal settings
+old_stty=$(stty -g 2>/dev/null)
+if [[ -z "$old_stty" ]]; then
+    echo "dark" >&2
+    exit 0
+fi
+
+# Set terminal to raw mode with timeout
+stty raw -echo min 0 time 5 2>/dev/null
+
+# Send OSC 11 query (with tmux passthrough if needed)
+if [[ -n "$TMUX" ]]; then
+    printf '\ePtmux;\e\e]11;?\e\e\\\e\\'
+else
+    printf '\e]11;?\e\\'
+fi
+
+# Read response
+response=""
+while IFS= read -r -n1 -t 0.5 char; do
+    response+="$char"
+    # Break on ST (string terminator) or BEL
+    if [[ "$char" == $'\a' ]] || [[ "$response" == *$'\e\\' ]]; then
+        break
+    fi
+done
+
+# Restore terminal settings
+stty "$old_stty" 2>/dev/null
+
+# Redirect output back to original stdout
+exec > /proc/$$/fd/1 2>/dev/null || exec > /dev/stdout 2>/dev/null
+
+# Parse RGB from response like "]11;rgb:RRRR/GGGG/BBBB"
+if [[ "$response" =~ rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+) ]]; then
+    r="${BASH_REMATCH[1]}"
+    g="${BASH_REMATCH[2]}"
+    b="${BASH_REMATCH[3]}"
+
+    # Convert hex to decimal (handle both 2-digit and 4-digit hex)
+    r=$((16#${r:0:2}))
+    g=$((16#${g:0:2}))
+    b=$((16#${b:0:2}))
+
+    # Calculate perceived luminance (simplified)
+    # luminance = 0.2126*R + 0.7152*G + 0.0722*B
+    luminance=$(( (2126 * r + 7152 * g + 722 * b) / 10000 ))
+
+    if (( luminance < 128 )); then
+        echo "dark"
+    else
+        echo "light"
+    fi
+else
+    # Fallback: assume dark if we can't parse
+    echo "dark"
+fi
