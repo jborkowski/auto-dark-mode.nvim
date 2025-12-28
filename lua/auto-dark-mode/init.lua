@@ -51,22 +51,18 @@ local system
 -- Works over SSH/remote sessions by detecting terminal background color
 ---@param callback fun(is_dark_mode: boolean)
 local function check_osc11_dark_mode(callback)
-	-- Use helper script if available, otherwise use inline detection
+	-- Use helper script if available
 	local script = vim.fn.expand("~/.local/bin/query-terminal-bg")
 	if vim.fn.executable(script) == 1 then
-		utils.start_job(script, {
-			on_stdout = function(data)
-				local response = (data[1] or ""):gsub("%s+", "")
-				local is_dark = response == "dark"
-				callback(is_dark)
-			end,
-		})
+		-- Run synchronously with system() to maintain TTY access
+		local result = vim.fn.system(script)
+		result = result:gsub("%s+", "")
+		local is_dark = result == "dark"
+		callback(is_dark)
 		return
 	end
 
-	-- Fallback: try to detect via terminfo or assume dark
-	-- Most modern terminals support OSC 11, but reading response is tricky
-	-- without a helper script that can handle TTY I/O properly
+	-- Fallback: assume dark
 	callback(true)
 end
 
