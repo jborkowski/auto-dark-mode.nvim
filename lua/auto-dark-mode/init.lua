@@ -51,19 +51,42 @@ local system
 -- Works over SSH/remote sessions by detecting terminal background color
 ---@param callback fun(is_dark_mode: boolean)
 local function check_osc11_dark_mode(callback)
-	-- Use helper script if available
-	local script = vim.fn.expand("~/.local/bin/query-terminal-bg")
-	if vim.fn.executable(script) == 1 then
-		-- Run synchronously with system() to maintain TTY access
-		local result = vim.fn.system(script)
-		result = result:gsub("%s+", "")
-		local is_dark = result == "dark"
-		callback(is_dark)
-		return
-	end
+	-- Query terminal background using vim's native terminal response mechanism
+	local response_received = false
 
-	-- Fallback: assume dark
-	callback(true)
+	-- Set up response handler
+	vim.api.nvim_create_autocmd("TermResponse", {
+		once = true,
+		callback = function(args)
+			response_received = true
+			-- args.data is a table with 'sequence' key
+			local resp = (args.data and args.data.sequence) or ""
+
+			-- Parse rgb:RRRR/GGGG/BBBB
+			local r, g, b = string.match(resp, "rgb:(%x+)/(%x+)/(%x+)")
+			if r then
+				local red = tonumber(r:sub(1, 2), 16) or 0
+				local green = tonumber(g:sub(1, 2), 16) or 0
+				local blue = tonumber(b:sub(1, 2), 16) or 0
+				local luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue
+				local is_dark = luminance < 128
+				callback(is_dark)
+			else
+				callback(true)
+			end
+		end,
+	})
+
+	-- Send OSC 11 query
+	io.write("\027]11;?\027\\")
+	io.flush()
+
+	-- Timeout fallback
+	vim.defer_fn(function()
+		if not response_received then
+			callback(true)
+		end
+	end, 500)
 end
 
 -- Parses the query response for each system
@@ -127,8 +150,6 @@ local function init()
 	-- Check for SSH/remote session first - use OSC 11 for terminal bg detection
 	if os.getenv("SSH_TTY") or os.getenv("SSH_CONNECTION") then
 		system = "OSC11"
-		-- Auto-install helper script if needed
-		install_helper_script()
 	elseif string.match(vim.loop.os_uname().release, "WSL") then
 		system = "WSL"
 	elseif vim.fn.filereadable("/.dockerenv") == 1 then
@@ -139,7 +160,6 @@ local function init()
 	else
 		system = vim.loop.os_uname().sysname
 	end
-
 
 	if system == "OSC11" then
 		-- No external command needed, handled by check_osc11_dark_mode
