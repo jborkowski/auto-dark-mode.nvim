@@ -15,8 +15,31 @@ local update_interval
 
 ---@type string
 local query_command
----@type "Linux" | "Darwin" | "Windows_NT" | "WSL"
+---@type "Linux" | "Darwin" | "Windows_NT" | "WSL" | "OSC11"
 local system
+
+-- Query terminal background via OSC 11
+-- Works over SSH/remote sessions by detecting terminal background color
+---@param callback fun(is_dark_mode: boolean)
+local function check_osc11_dark_mode(callback)
+	-- Use helper script if available, otherwise use inline detection
+	local script = vim.fn.expand("~/.local/bin/query-terminal-bg")
+	if vim.fn.executable(script) == 1 then
+		utils.start_job(script, {
+			on_stdout = function(data)
+				local response = (data[1] or ""):gsub("%s+", "")
+				local is_dark = response == "dark"
+				callback(is_dark)
+			end,
+		})
+		return
+	end
+
+	-- Fallback: try to detect via terminfo or assume dark
+	-- Most modern terminals support OSC 11, but reading response is tricky
+	-- without a helper script that can handle TTY I/O properly
+	callback(true)
+end
 
 -- Parses the query response for each system
 ---@param res string
@@ -28,8 +51,8 @@ local function parse_query_response(res)
 		-- 1: dark
 		-- 2: light
 		return string.match(res, "uint32 1") ~= nil
-	elseif system == "Linux" or system == "DockerLinux" then
-		return string.match(res, "1") ~= nil 
+	elseif system == "Linux" or system == "DockerLinux" or system == "RemoteLinux" then
+		return string.match(res, "1") ~= nil
 	elseif system == "Darwin" then
 		return res == "Dark"
 	elseif system == "Windows_NT" or system == "WSL" then
@@ -42,13 +65,17 @@ end
 
 ---@param callback fun(is_dark_mode: boolean)
 local function check_is_dark_mode(callback)
-	utils.start_job(query_command, {
-		on_stdout = function(data)
-			-- we only care about the first line of the response
-			local is_dark_mode = parse_query_response(data[1])
-			callback(is_dark_mode)
-		end,
-	})
+	if system == "OSC11" then
+		check_osc11_dark_mode(callback)
+	else
+		utils.start_job(query_command, {
+			on_stdout = function(data)
+				-- we only care about the first line of the response
+				local is_dark_mode = parse_query_response(data[1])
+				callback(is_dark_mode)
+			end,
+		})
+	end
 end
 
 ---@param is_dark_mode boolean
@@ -72,22 +99,30 @@ local function start_check_timer()
 end
 
 local function init()
-	if string.match(vim.loop.os_uname().release, "WSL") then
+	-- Check for SSH/remote session first - use OSC 11 for terminal bg detection
+	if os.getenv("SSH_TTY") or os.getenv("SSH_CONNECTION") then
+		system = "OSC11"
+	elseif string.match(vim.loop.os_uname().release, "WSL") then
 		system = "WSL"
 	elseif vim.fn.filereadable("/.dockerenv") == 1 then
 		system = "Docker" .. vim.loop.os_uname().sysname
-		print("Running inside Docker container")
+	elseif vim.fn.filereadable(vim.fn.expand("~/.color-scheme")) == 1 then
+		-- File-based theme sync fallback
+		system = "RemoteLinux"
 	else
 		system = vim.loop.os_uname().sysname
 	end
 
 
-	if system == "Darwin" then
+	if system == "OSC11" then
+		-- No external command needed, handled by check_osc11_dark_mode
+		query_command = nil
+	elseif system == "Darwin" then
 		query_command = "defaults read -g AppleInterfaceStyle"
-	elseif system == "Linux" then 
+	elseif system == "Linux" then
 		query_command = "dconf read /org/gnome/desktop/interface/color-scheme | grep 'prefer-dark' | wc -l"
-  elseif system == "DockerLinux" then 
-    query_command = "cat ~/.color-scheme | grep 'prefer-dark' | wc -l"
+	elseif system == "DockerLinux" or system == "RemoteLinux" then
+		query_command = "cat ~/.color-scheme | grep 'prefer-dark' | wc -l"
 	elseif system == "LinuxLegacy" then
 		if not vim.fn.executable("dbus-send") then
 			error([[
@@ -112,7 +147,7 @@ local function init()
 		return
 	end
 
-	if vim.fn.has("unix") ~= 0 then
+	if query_command and vim.fn.has("unix") ~= 0 then
 		if vim.loop.getuid() == 0 then
 			query_command = "su - $SUDO_USER -c " .. query_command
 		end

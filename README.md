@@ -42,6 +42,28 @@ Plug 'f-person/auto-dark-mode.nvim'
   Windows 10+ or WSL
 * Neovim
 
+## SSH / Remote Sessions
+
+For SSH or remote sessions, the plugin can detect the terminal's background color
+using OSC 11 escape sequences. This works with terminals that support OSC 11,
+including Ghostty, iTerm2, and many others.
+
+### Setup
+
+1. Install the helper script on the remote machine:
+   ```bash
+   cp scripts/query-terminal-bg ~/.local/bin/
+   chmod +x ~/.local/bin/query-terminal-bg
+   ```
+
+2. If using tmux, enable passthrough in your `tmux.conf`:
+   ```
+   set -g allow-passthrough on
+   ```
+
+3. The plugin will automatically detect SSH sessions (`SSH_TTY` or `SSH_CONNECTION`
+   environment variables) and use OSC 11 to query the terminal background color.
+
 ## Configuration
 You need to call `setup` for initialization.
 `setup` accepts a table with options – `set_dark_mode` function,
