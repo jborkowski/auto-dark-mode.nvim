@@ -48,21 +48,18 @@ For SSH or remote sessions, the plugin can detect the terminal's background colo
 using OSC 11 escape sequences. This works with terminals that support OSC 11,
 including Ghostty, iTerm2, and many others.
 
+The helper script (`query-terminal-bg`) is **automatically installed** to
+`~/.local/bin/` when the plugin detects an SSH session.
+
 ### Setup
 
-1. Install the helper script on the remote machine:
-   ```bash
-   cp scripts/query-terminal-bg ~/.local/bin/
-   chmod +x ~/.local/bin/query-terminal-bg
-   ```
+If using tmux, enable passthrough in your `tmux.conf`:
+```
+set -g allow-passthrough on
+```
 
-2. If using tmux, enable passthrough in your `tmux.conf`:
-   ```
-   set -g allow-passthrough on
-   ```
-
-3. The plugin will automatically detect SSH sessions (`SSH_TTY` or `SSH_CONNECTION`
-   environment variables) and use OSC 11 to query the terminal background color.
+The plugin will automatically detect SSH sessions (`SSH_TTY` or `SSH_CONNECTION`
+environment variables) and use OSC 11 to query the terminal background color.
 
 ## Configuration
 You need to call `setup` for initialization.

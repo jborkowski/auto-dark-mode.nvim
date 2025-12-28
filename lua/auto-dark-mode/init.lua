@@ -1,5 +1,34 @@
 local utils = require("auto-dark-mode.utils")
 
+-- Install helper script for OSC11 detection (SSH/remote sessions)
+local function install_helper_script()
+	local target = vim.fn.expand("~/.local/bin/query-terminal-bg")
+	local target_dir = vim.fn.expand("~/.local/bin")
+
+	-- Skip if already installed
+	if vim.fn.executable(target) == 1 then
+		return
+	end
+
+	-- Find the script in the plugin directory
+	local source = debug.getinfo(1, "S").source:sub(2)
+	local plugin_dir = vim.fn.fnamemodify(source, ":h:h:h")
+	local script = plugin_dir .. "/scripts/query-terminal-bg"
+
+	if vim.fn.filereadable(script) ~= 1 then
+		return
+	end
+
+	-- Create target directory if needed
+	if vim.fn.isdirectory(target_dir) == 0 then
+		vim.fn.mkdir(target_dir, "p")
+	end
+
+	-- Copy and make executable
+	vim.fn.system({ "cp", script, target })
+	vim.fn.system({ "chmod", "+x", target })
+end
+
 ---@type number
 local timer_id
 ---@type boolean
@@ -102,6 +131,8 @@ local function init()
 	-- Check for SSH/remote session first - use OSC 11 for terminal bg detection
 	if os.getenv("SSH_TTY") or os.getenv("SSH_CONNECTION") then
 		system = "OSC11"
+		-- Auto-install helper script if needed
+		install_helper_script()
 	elseif string.match(vim.loop.os_uname().release, "WSL") then
 		system = "WSL"
 	elseif vim.fn.filereadable("/.dockerenv") == 1 then
